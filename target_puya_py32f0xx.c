@@ -68,7 +68,6 @@
 
 #define OPTIONS_OPTR           0x1fff0e80
 #define OPTIONS_SDKR           0x1fff0e84
-#define OPTIONS_BOOT           0x1fff0e88 // Only on PY32F002B
 #define OPTIONS_WRPR           0x1fff0e8c
 
 #define STATUS_INTERVAL        32 // pages
@@ -85,8 +84,7 @@ typedef struct
 /*- Variables ---------------------------------------------------------------*/
 static device_t devices[] =
 {
-  { 0x60001000, "py32f0", "PY32F002Axx5", 20*1024 },
-  { 0x20220064, "py32f0", "PY32F002Bxx5", 24*1024 },
+  { 0x60001000, "py32f0xx", "PY32F002Ax5", 20*1024 },
 };
 
 static device_t target_device;
@@ -108,7 +106,9 @@ static void flash_wait_done(void)
 //-----------------------------------------------------------------------------
 static void target_select(target_options_t *options)
 {
-  uint32_t idcode;
+  char* ts;
+  char  tc;
+  uint32_t idcode, memcfg, code, k;
   bool locked;
 
   dap_disconnect();
@@ -125,13 +125,45 @@ static void target_select(target_options_t *options)
   sleep_ms(10);
 
   idcode = dap_read_word(DBG_IDCODE);
+   
+  memcfg = 24;
 
   for (int i = 0; i < ARRAY_SIZE(devices); i++)
   {
     if (devices[i].idcode != idcode)
       continue;
+    
+    //  detect  chip and size flash - for  F002A+
+    if ( i == 0 ) 
+    { 
+      memcfg = dap_read_word(0x1FFF0FFC);
+      memcfg = ((memcfg & 0x00000007) + 1) * 8; 
+      devices[i].flash_size = memcfg*1024;
 
-    verbose("Target: %s\n", devices[i].name);
+      ts = (char *)malloc(14);
+      ts[0] = 'P'; ts[1] = 'Y'; ts[2] = '3'; ts[3] = '2'; ts[4] = 'F'; ts[5] = '0';     
+      code   = dap_read_word(0x1FFF0D84);
+      tc = (char)(code & 0x7F); 
+      if ( tc == '2' )      {
+        k = 9; 
+        ts[6] = '0'; ts[7] = '2'; ts[8] = 'A';
+      } else {
+        k = 8; 
+        ts[6] = (char)(code/256 & 0x7F); 
+        ts[7] = tc;
+      } 
+      
+      code   = dap_read_word(0x1FFF0D88);
+      ts[k++] = (char)((code & 0xFF000000)/256/256/256); 
+      ts[k++] = (char)((code & 0xFF0000)/256/256); 
+      ts[k++] = (char)((code & 0xFF00)/256); 
+      ts[k++] = (char)(code & 0xFF); 
+      ts[k] = 0;
+          
+      devices[i].name = ts; 
+    }
+
+    verbose("Target:  %s  %dK flash\n", devices[i].name, memcfg);
 
     target_device = devices[i];
     target_options = *options;
@@ -324,8 +356,6 @@ static int target_fuse_read(int section, uint8_t *data)
     value = dap_read_word(OPTIONS_OPTR);
   else if (1 == section)
     value = dap_read_word(OPTIONS_SDKR);
-  else if (2 == section)
-    value = dap_read_word(OPTIONS_BOOT);
   else if (3 == section)
     value = dap_read_word(OPTIONS_WRPR);
   else
@@ -348,8 +378,6 @@ static void target_fuse_write(int section, uint8_t *data)
     dap_write_word_req(FLASH_OPTR, value);
   else if (1 == section)
     dap_write_word_req(FLASH_SDKR, value);
-  else if (2 == section)
-    dap_write_word_req(FLASH_BTCR, value);
   else if (3 == section)
     dap_write_word_req(FLASH_WRPR, value);
   else
@@ -377,11 +405,11 @@ static char target_help[] =
   "  The option bytes are represented by the following sections (32-bits each):\n"
   "    0 - OPTR (User Options)\n"
   "    1 - SDKR (Software Design Kit Protection)\n"
-  "    2 - BTCR (Boot Control, only for PY32F002B)\n"
+  "    2 - not use\n"
   "    3 - WRPR (Write Protection)\n";
 
 //-----------------------------------------------------------------------------
-target_ops_t target_puya_py32f0_ops =
+target_ops_t target_puya_py32f0xx_ops =
 {
   .select    = target_select,
   .deselect  = target_deselect,

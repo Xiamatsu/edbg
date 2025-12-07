@@ -19,7 +19,8 @@ SRCS = \
   target_nu_m480.c \
   target_lattice_lcmxo2.c \
   target_rpi_rp2040.c \
-  target_puya_py32f0.c \
+  target_puya_py32f0xx.c \
+  target_puya_py32f002b.c \
 
 HDRS = \
   dap.h \
