@@ -27,6 +27,12 @@
 #define AIRCR_VECTKEY          (0x05fa << 16)
 #define AIRCR_SYSRESETREQ      (1 << 2)
 
+#define RCC_CR                 0x40021000
+#define RCC_ICSCR              0x40021004
+#define RCC_CR_HSIRDY          (1 << 10)
+
+#define RCC_HSI_CONST_24M      0x1FFF0F10
+
 #define FLASH_ACR              0x40022000
 #define FLASH_KEYR             0x40022008
 #define FLASH_OPTKEYR          0x4002200c
@@ -36,6 +42,18 @@
 #define FLASH_SDKR             0x40022024
 #define FLASH_BTCR             0x40022028
 #define FLASH_WRPR             0x4002202c
+
+#define FLASH_TS0              0x40022100 
+#define FLASH_TS1              0x40022104 
+#define FLASH_TS2P             0x40022108 
+#define FLASH_TPS3             0x4002210C 
+#define FLASH_TS3              0x40022110 
+#define FLASH_PERTPE           0x40022114
+#define FLASH_SMERTPE          0x40022118
+#define FLASH_PRGTPE           0x4002211C
+#define FLASH_PRETPE           0x40022120
+
+#define FLASH_CONST_BASE       0x1FFF0F1C
 
 #define DBG_IDCODE             0x40015800
 
@@ -89,6 +107,8 @@ static device_t devices[] =
 
 static device_t target_device;
 static target_options_t target_options;
+
+static uint32_t rcc_icscr_save; 
 
 /*- Implementations ---------------------------------------------------------*/
 
@@ -161,6 +181,30 @@ static void target_select(target_options_t *options)
       ts[k] = 0;
           
       devices[i].name = ts; 
+      /*
+      rcc_icscr_save = dap_read_word( RCC_ICSCR );
+      code = dap_read_half( RCC_HSI_CONST_24M );
+      dap_write_half( RCC_ICSCR, code );
+
+      while ( (dap_read_word( RCC_CR ) & RCC_CR_HSIRDY) == 0 );
+
+      // init flash parameters for default HSI - 8 MHz 
+      #define F_OFFSET  (14 * 4)
+      code = dap_read_word( FLASH_CONST_BASE + F_OFFSET );
+      dap_write_word( FLASH_TS0, code & 0x00FF );
+      dap_write_word( FLASH_TS3, ( code >> 8 ) & 0x00FF );
+      dap_write_word( FLASH_TS1, ( code >> 16 ) & 0x01FF );
+      code = dap_read_word( FLASH_CONST_BASE + F_OFFSET + 0x04);
+      dap_write_word( FLASH_TS2P, code & 0x00FF );
+      dap_write_word( FLASH_TPS3, ( code >> 16 ) & 0x07FF );
+      code = dap_read_word( FLASH_CONST_BASE + F_OFFSET + 0x08);
+      dap_write_word( FLASH_PERTPE, code & 0x1FFFF );
+      code = dap_read_word( FLASH_CONST_BASE + F_OFFSET + 0x0C);
+      dap_write_word( FLASH_SMERTPE, code & 0x1FFFF );
+      code = dap_read_word( FLASH_CONST_BASE + F_OFFSET + 0x10);
+      dap_write_word( FLASH_PRGTPE, code & 0xFFFF );
+      dap_write_word( FLASH_PRETPE, ( code >> 16 ) & 0xFFFF );
+      */  
     }
 
     verbose("Target:  %s  %dK flash\n", devices[i].name, memcfg);
@@ -193,8 +237,12 @@ static void target_select(target_options_t *options)
 //-----------------------------------------------------------------------------
 static void target_deselect(void)
 {
+  dap_write_word(RCC_ICSCR, rcc_icscr_save);
   dap_write_word(DEMCR, 0);
   dap_write_word(AIRCR, AIRCR_VECTKEY | AIRCR_SYSRESETREQ);
+
+  //dap_write_word(0x40015804, 0x00000002);
+  //dap_write_word(0x40015808, 0x00001800);
 
   target_free_options(&target_options);
 }
