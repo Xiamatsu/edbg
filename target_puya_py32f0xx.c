@@ -187,9 +187,10 @@ static void target_select(target_options_t *options)
       dap_write_half( RCC_ICSCR, code );
 
       while ( (dap_read_word( RCC_CR ) & RCC_CR_HSIRDY) == 0 );
-
+      
+      
       // init flash parameters for default HSI - 8 MHz 
-      #define F_OFFSET  (14 * 4)
+      #define F_OFFSET  (14 * 1)
       code = dap_read_word( FLASH_CONST_BASE + F_OFFSET );
       dap_write_word( FLASH_TS0, code & 0x00FF );
       dap_write_word( FLASH_TS3, ( code >> 8 ) & 0x00FF );
@@ -237,7 +238,7 @@ static void target_select(target_options_t *options)
 //-----------------------------------------------------------------------------
 static void target_deselect(void)
 {
-  dap_write_word(RCC_ICSCR, rcc_icscr_save);
+  //dap_write_word(RCC_ICSCR, rcc_icscr_save);
   dap_write_word(DEMCR, 0);
   dap_write_word(AIRCR, AIRCR_VECTKEY | AIRCR_SYSRESETREQ);
 
